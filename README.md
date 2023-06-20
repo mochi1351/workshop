@@ -1,2 +1,4 @@
 # workshop
-this is where i gather my workshop tools
+### mochivani Installation for preparating my ubuntu server for development
+
+
