@@ -1,0 +1,83 @@
+---
+- name: Install Docker Compose with WordPress and phpMyAdmin
+  hosts: all
+  become: true
+
+  vars:
+    wordpress_dir: "/opt/wordpress"
+    mysql_root_password: "example_root_password"
+    wordpress_db_password: "example_wp_password"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+      changed_when: false
+
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+        state: present
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker and Docker Compose
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+      notify:
+        - Restart Docker service
+
+    - name: Add current user to the docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Install Docker Python package
+      pip:
+        name: docker
+        state: present
+
+    - name: Create a directory for the WordPress application
+      ansible.builtin.file:
+        path: "{{ wordpress_dir }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: Create Docker Compose file
+      ansible.builtin.template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ wordpress_dir }}/docker-compose.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0644'
+
+    - name: Start WordPress and phpMyAdmin with Docker Compose
+      command: docker-compose up -d
+      args:
+        chdir: "{{ wordpress_dir }}"
+      become: false
+
+  handlers:
+    - name: Restart Docker service
+      ansible.builtin.service:
+        name: docker
+        state: restarted
